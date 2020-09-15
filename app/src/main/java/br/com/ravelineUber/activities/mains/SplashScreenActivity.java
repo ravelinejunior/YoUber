@@ -3,6 +3,7 @@ package br.com.ravelineUber.activities.mains;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
@@ -26,6 +27,7 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.iid.FirebaseInstanceId;
 
 import java.util.Arrays;
 import java.util.List;
@@ -35,6 +37,7 @@ import java.util.concurrent.TimeUnit;
 import br.com.ravelineUber.R;
 import br.com.ravelineUber.model.Driver;
 import br.com.ravelineUber.utils.Common;
+import br.com.ravelineUber.utils.UserUtils;
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
@@ -90,10 +93,20 @@ public class SplashScreenActivity extends AppCompatActivity {
         listener = myFirebaseAuth -> {
             FirebaseUser user = myFirebaseAuth.getCurrentUser();
             if (user != null) {
-                Toast.makeText(this, "Bem vindo " , Toast.LENGTH_SHORT).show();
+
+                //update token
+                FirebaseInstanceId.getInstance().getInstanceId()
+                        .addOnFailureListener(e ->
+                                Toast.makeText(SplashScreenActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show())
+
+                        .addOnSuccessListener(instanceIdResult ->{
+                                UserUtils.updateToken(SplashScreenActivity.this, instanceIdResult.getToken());
+                            Log.d("TOKEN",instanceIdResult.getToken());
+                        });
+
+
                 checkUserFromFirebase();
-            }
-            else
+            } else
                 showLoginLayout();
         };
     }
@@ -122,6 +135,8 @@ public class SplashScreenActivity extends AppCompatActivity {
         if (requestCode == LOGIN_REQUEST_CODE) {
             IdpResponse response = IdpResponse.fromResultIntent(data);
             if (resultCode == RESULT_OK) {
+
+
                 checkUserFromFirebase();
 
             } else {
@@ -136,7 +151,7 @@ public class SplashScreenActivity extends AppCompatActivity {
                     @Override
                     public void onDataChange(@NonNull DataSnapshot snapshot) {
                         if (snapshot.exists()) {
-                           // Toast.makeText(SplashScreenActivity.this, "Usuário já existe na base de dados!", Toast.LENGTH_SHORT).show();
+                            // Toast.makeText(SplashScreenActivity.this, "Usuário já existe na base de dados!", Toast.LENGTH_SHORT).show();
                             Driver driver = snapshot.getValue(Driver.class);
                             goToHomeActivity(driver);
                         } else {
@@ -208,7 +223,7 @@ public class SplashScreenActivity extends AppCompatActivity {
                             Completable.timer(2, TimeUnit.SECONDS, AndroidSchedulers.mainThread())
                                     .subscribe(() -> progressBarSplash.setVisibility(View.GONE));
                             dialog.dismiss();
-                          goToHomeActivity(driver);
+                            goToHomeActivity(driver);
                         });
             }
 

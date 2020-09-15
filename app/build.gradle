@@ -40,8 +40,9 @@ dependencies {
     implementation 'com.google.firebase:firebase-core:17.5.0'
     implementation 'com.google.firebase:firebase-database:19.4.0'
     implementation 'com.google.firebase:firebase-storage:19.2.0'
-    implementation 'com.google.firebase:firebase-auth:19.3.2'
+    implementation 'com.google.firebase:firebase-auth:19.4.0'
     implementation 'com.google.firebase:firebase-firestore:21.6.0'
+    implementation 'com.google.firebase:firebase-messaging:20.2.4'
 
     //firebase UI
     implementation 'com.firebaseui:firebase-ui-auth:6.2.1'
@@ -73,6 +74,10 @@ dependencies {
 
     //dexter
     implementation 'com.karumi:dexter:6.1.2'
+
+    //glide
+    implementation 'com.github.bumptech.glide:glide:4.11.0'
+    annotationProcessor 'com.github.bumptech.glide:compiler:4.11.0'
 
 
     testImplementation 'junit:junit:4.12'
