@@ -3,6 +3,8 @@ package br.com.ravelineUber.activities.ui.home;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
+import android.location.Address;
+import android.location.Geocoder;
 import android.os.Bundle;
 import android.os.Looper;
 import android.util.Log;
@@ -44,6 +46,9 @@ import com.karumi.dexter.listener.PermissionGrantedResponse;
 import com.karumi.dexter.listener.PermissionRequest;
 import com.karumi.dexter.listener.single.PermissionListener;
 
+import java.util.List;
+import java.util.Locale;
+
 import br.com.ravelineUber.R;
 import br.com.ravelineUber.utils.Common;
 
@@ -60,7 +65,7 @@ public class HomeFragment extends Fragment implements OnMapReadyCallback {
     ValueEventListener onlineValueEventListener = new ValueEventListener() {
         @Override
         public void onDataChange(@NonNull DataSnapshot snapshot) {
-            if (snapshot.exists())
+            if (snapshot.exists() && currentUserRef != null)
                 currentUserRef.onDisconnect().removeValue();
         }
 
@@ -79,7 +84,7 @@ public class HomeFragment extends Fragment implements OnMapReadyCallback {
     @Override
     public void onDestroy() {
         fusedLocationProviderClient.removeLocationUpdates(locationCallback);
-        if(auth.getCurrentUser() != null){
+        if (auth.getCurrentUser() != null) {
             geoFire.removeLocation(auth.getCurrentUser().getUid());
         }
 
@@ -116,16 +121,19 @@ public class HomeFragment extends Fragment implements OnMapReadyCallback {
     private void init() {
 
         onlineRef = firebaseDatabase.child(".info/connected");
-        driversLocationRef = firebaseDatabase.child(Common.DRIVERS_LOCATION_REFERENCES);
-        currentUserRef = firebaseDatabase.child(Common.DRIVERS_LOCATION_REFERENCES).child(auth.getCurrentUser().getUid());
-        geoFire = new GeoFire(driversLocationRef);
 
-        registerOnlineSystem();
+        if (ActivityCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+                ActivityCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+
+            Snackbar.make(getView(), "Favor aceitar permissão.", Snackbar.LENGTH_SHORT).
+                    setAnimationMode(Snackbar.ANIMATION_MODE_FADE).show();
+            return;
+        }
 
         locationRequest = new LocationRequest();
-        locationRequest.setSmallestDisplacement(10f);
-        locationRequest.setInterval(5000);
-        locationRequest.setFastestInterval(3000);
+        locationRequest.setSmallestDisplacement(50f);
+        locationRequest.setInterval(15000);
+        locationRequest.setFastestInterval(10000);
         locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
 
         locationCallback = new LocationCallback() {
@@ -136,28 +144,55 @@ public class HomeFragment extends Fragment implements OnMapReadyCallback {
                 LatLng newPosition = new LatLng(locationResult.getLastLocation().getLatitude(), locationResult.getLastLocation().getLongitude());
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(newPosition, 18f));
 
-                //Update Location
-                geoFire.setLocation(auth.getCurrentUser().getUid(), new GeoLocation(locationResult.getLastLocation().getLatitude(),
-                        locationResult.getLastLocation().getLongitude()), (key, error) -> {
-                    if (error != null)
-                        Snackbar.make(mapFragment.getView(), error.getMessage(), Snackbar.LENGTH_SHORT).
-                                setAnimationMode(Snackbar.ANIMATION_MODE_FADE).show();
-                    else {
+                //get address name
+                Geocoder geocoder = new Geocoder(getContext(), Locale.getDefault());
+                List<Address> addressList;
+                try {
+                    addressList = geocoder.getFromLocation(
+                            locationResult.getLastLocation().getLatitude(),
+                            locationResult.getLastLocation().getLongitude(),
+                            1
+                    );
+                    String cityName = addressList.get(0).getSubAdminArea();
 
-                        Snackbar.make(mapFragment.getView(), "Você está online", Snackbar.LENGTH_SHORT).
-                                setAnimationMode(Snackbar.ANIMATION_MODE_FADE).show();
-                    }
-                });
+                    driversLocationRef = firebaseDatabase.child(Common.DRIVERS_LOCATION_REFERENCES).child(cityName);
+                    currentUserRef = driversLocationRef.child(auth.getCurrentUser().getUid());
+                    geoFire = new GeoFire(driversLocationRef);
+
+                    //Update Location
+                    geoFire.setLocation(auth.getCurrentUser().getUid(),
+                            new GeoLocation(locationResult.getLastLocation().getLatitude(),
+                                    locationResult.getLastLocation().getLongitude()), (key, error) -> {
+                                if (error != null)
+                                    Snackbar.make(getView(), error.getMessage(), Snackbar.LENGTH_SHORT).
+                                            setAnimationMode(Snackbar.ANIMATION_MODE_FADE).show();
+                                else {
+
+                                    Snackbar.make(getView(), "Você está online", Snackbar.LENGTH_SHORT).
+                                            setAnimationMode(Snackbar.ANIMATION_MODE_FADE).show();
+                                }
+                            });
+
+                    registerOnlineSystem();
+                } catch (Exception e) {
+                    Snackbar.make(getView(), e.getMessage(), Snackbar.LENGTH_SHORT).
+                            setAnimationMode(Snackbar.ANIMATION_MODE_FADE).show();
+                }
+
+
             }
         };
 
         fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(getContext());
+
         if (ActivityCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
                 && ActivityCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
 
             return;
         }
+
         fusedLocationProviderClient.requestLocationUpdates(locationRequest, locationCallback, Looper.myLooper());
+
 
     }
 
